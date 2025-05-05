@@ -2,6 +2,11 @@
 name = "glenda"
 version = "0.1.0"
 edition = "2024"
+license = "MIT OR Apache-2.0"
+keywords = ["opengl", "graphics", "gamedev"]
+description = "An opengl utility and renderer library."
+repository = "https://github.com/blindley/glenda"
+readme = "README.md"
 
 [dependencies]
 gl = "0.14"
