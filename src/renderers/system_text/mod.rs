@@ -2,12 +2,12 @@ use std::collections::HashMap;
 
 include!(concat!(env!("OUT_DIR"), "/system_text_font.rs"));
 
-use crate::renderers::{Renderer, IntRect};
+use crate::renderers::{Renderer, Viewport};
 
 type Error = Box<dyn std::error::Error>;
 
 pub struct SystemTextRenderer {
-    viewport_rect: IntRect,
+    viewport: Viewport,
     program: u32,
     character_vertices: HashMap<char, Vec<f32>>,
     text: Option<SystemText>,
@@ -83,12 +83,12 @@ impl Drop for SystemText {
 }
 
 impl SystemTextRenderer {
-    pub fn new(viewport_rect: IntRect) -> Result<Self, Error> {
+    pub fn new(viewport: Viewport) -> Result<Self, Error> {
         let program = create_program()?;
         let character_vertices = create_character_vertices();
 
         let mut self_ = Self {
-            viewport_rect,
+            viewport,
             program,
             character_vertices,
             text: None,
@@ -142,13 +142,13 @@ impl SystemTextRenderer {
 }
 
 impl Renderer for SystemTextRenderer {
-    fn set_viewport(&mut self, _viewport_rect: IntRect) {
-        self.viewport_rect = _viewport_rect;
+    fn set_viewport(&mut self, _viewport: Viewport) {
+        self.viewport = _viewport;
     }
 
     fn render(&self) {
         if let Some(ref text) = self.text {
-            self.viewport_rect.gl_viewport();
+            self.viewport.gl_viewport();
             unsafe {
                 gl::UseProgram(self.program);
                 gl::BindVertexArray(text.vao);
@@ -213,22 +213,16 @@ fn create_vertex_array() -> Result<(u32, u32), Error> {
 }
 
 fn create_program() -> Result<u32, Error> {
-    use crate::gl_utils::{compile_shader, link_shader_program};
+    use crate::gl_utils::shader::ShaderProgramBuilder;
 
     let vshader_code = include_str!("shaders/vshader.glsl");
     let fshader_code = include_str!("shaders/fshader.glsl");
 
-    let vshader = compile_shader(vshader_code, gl::VERTEX_SHADER)?;
-    let fshader = compile_shader(fshader_code, gl::FRAGMENT_SHADER)?;
+    let mut builder = ShaderProgramBuilder::new();
+    builder.add_vertex_shader(vshader_code)?;
+    builder.add_fragment_shader(fshader_code)?;
 
-    let shaders = &[vshader, fshader];
-
-    let program = link_shader_program(shaders)?;
-
-    unsafe {
-        gl::DeleteShader(vshader);
-        gl::DeleteShader(fshader);
-    }
+    let program = builder.build()?;
 
     Ok(program)
 }

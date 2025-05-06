@@ -1,7 +1,6 @@
-use crate::gl_utils::{compile_shader, link_shader_program, create_buffer_f32};
 use crate::image::ImageRef;
 
-use crate::renderers::{Renderer, IntRect};
+use crate::renderers::{Renderer, Viewport};
 
 type Error = Box<dyn std::error::Error>;
 
@@ -45,17 +44,17 @@ impl Drop for ImageTexture {
 
 pub struct ImageRenderer {
     renderer: _ImageRenderer,
-    viewport_rect: IntRect,
+    viewport: Viewport,
     texture: Option<ImageTexture>,
 }
 
 impl ImageRenderer {
-    pub fn new(viewport_rect: IntRect) -> Result<Self, Error> {
+    pub fn new(viewport: Viewport) -> Result<Self, Error> {
         let renderer = _ImageRenderer::new()?;
 
         Ok(Self {
             renderer,
-            viewport_rect,
+            viewport,
             texture: None,
         })
     }
@@ -76,13 +75,13 @@ impl ImageRenderer {
 }
 
 impl Renderer for ImageRenderer {
-    fn set_viewport(&mut self, viewport_rect: IntRect) {
-        self.viewport_rect = viewport_rect;
+    fn set_viewport(&mut self, viewport: Viewport) {
+        self.viewport = viewport;
     }
 
     fn render(&self) {
         if let Some(ref texture) = self.texture {
-            self.viewport_rect.gl_viewport();
+            self.viewport.gl_viewport();
             self.renderer.render(texture);
         }
     }
@@ -96,15 +95,16 @@ struct _ImageRenderer {
 
 impl _ImageRenderer {
     pub fn new() -> Result<Self, Error> {
+        use crate::gl_utils::vertex_array::create_buffer;
+        use crate::gl_utils::shader::ShaderProgramBuilder;
+
         let vcode = include_str!("shaders/vertex_shader.glsl");
         let fcode = include_str!("shaders/fragment_shader.glsl");
 
-        let vshader = compile_shader(vcode, gl::VERTEX_SHADER)?;
-        let fshader = compile_shader(fcode, gl::FRAGMENT_SHADER)?;
-
-        let shaders = &[vshader, fshader];
-
-        let program = link_shader_program(shaders)?;
+        let mut builder = ShaderProgramBuilder::new();
+        builder.add_vertex_shader(vcode)?;
+        builder.add_fragment_shader(fcode)?;
+        let program = builder.build()?;
 
         let vertices: &[f32] = &[
             // positions
@@ -120,7 +120,7 @@ impl _ImageRenderer {
             0.0, 1.0,
         ];
 
-        let vbo = create_buffer_f32(vertices, gl::DYNAMIC_DRAW)?;
+        let vbo = create_buffer(vertices, gl::DYNAMIC_DRAW)?;
 
         let mut vao = 0;
         unsafe {

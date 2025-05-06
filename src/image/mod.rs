@@ -116,7 +116,7 @@ impl<'a> ImageRef<'a> {
     }
 
     pub fn create_texture(&self) -> Result<u32, Error> {
-        use crate::gl_utils::{create_texture_rgb, create_texture_rgba};
+        use crate::gl_utils::texture::{create_texture_rgb, create_texture_rgba};
 
         match self.pixel_array {
             PixelArrayRef::RGB(data)
