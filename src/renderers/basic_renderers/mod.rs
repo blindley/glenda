@@ -1,6 +1,8 @@
 
-use crate::gl;
 use crate::renderers::{Renderer, Viewport};
+
+mod mono_color_renderer;
+pub use mono_color_renderer::MonoColorRenderer;
 
 /// A renderer that does nothing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -9,35 +11,6 @@ pub struct NullRenderer;
 impl Renderer for NullRenderer {
     fn set_viewport(&mut self, _viewport: Viewport) {}
     fn render(&self) {}
-}
-
-/// Fills the viewport with a solid color.
-pub struct ClearColorRenderer {
-    viewport: Viewport,
-    color: [f32; 4],
-}
-
-impl ClearColorRenderer {
-    pub fn new(viewport: Viewport, color: [f32; 4]) -> Self {
-        Self {
-            viewport,
-            color,
-        }
-    }
-}
-
-impl Renderer for ClearColorRenderer {
-    fn set_viewport(&mut self, viewport: Viewport) {
-        self.viewport = viewport;
-    }
-
-    fn render(&self) {
-        self.viewport.gl_viewport();
-        unsafe {
-            gl::ClearColor(self.color[0], self.color[1], self.color[2], self.color[3]);
-            gl::Clear(gl::COLOR_BUFFER_BIT);
-        }
-    }
 }
 
 /// Defines the split point of a split renderer.
@@ -66,18 +39,18 @@ impl SplitPoint {
     }
 }
 
-struct SplitRenderer {
+struct SplitRenderer<R1: Renderer, R2: Renderer> {
     viewport: Viewport,
     horizontal: bool,
     split_point: SplitPoint,
-    r1: Box<dyn Renderer>,
-    r2: Box<dyn Renderer>,
+    r1: R1,
+    r2: R2,
 }
 
-impl SplitRenderer {
-    pub fn new(viewport: Viewport, horizontal: bool, split_point: SplitPoint, r1: Box<dyn Renderer>, r2: Box<dyn Renderer>) -> Self {
+impl<R1: Renderer, R2: Renderer> SplitRenderer<R1, R2> {
+    pub fn new(horizontal: bool, split_point: SplitPoint, r1: R1, r2: R2) -> Self {
         let mut self_ = Self {
-            viewport,
+            viewport: Viewport::default(),
             horizontal,
             split_point,
             r1,
@@ -88,20 +61,20 @@ impl SplitRenderer {
         self_
     }
 
-    pub fn get_r1(&self) -> &dyn Renderer {
-        self.r1.as_ref()
+    pub fn get_r1(&self) -> &R1 {
+        &self.r1
     }
 
-    pub fn get_r2(&self) -> &dyn Renderer {
-        self.r2.as_ref()
+    pub fn get_r2(&self) -> &R2 {
+        &self.r2
     }
 
-    pub fn get_r1_mut(&mut self) -> &mut dyn Renderer {
-        self.r1.as_mut()
+    pub fn get_r1_mut(&mut self) -> &mut R1 {
+        &mut self.r1
     }
 
-    pub fn get_r2_mut(&mut self) -> &mut dyn Renderer {
-        self.r2.as_mut()
+    pub fn get_r2_mut(&mut self) -> &mut R2 {
+        &mut self.r2
     }
 
     pub fn set_split_point(&mut self, split_point: SplitPoint) {
@@ -141,7 +114,7 @@ impl SplitRenderer {
     }
 }
 
-impl Renderer for SplitRenderer {
+impl<R1: Renderer, R2: Renderer> Renderer for SplitRenderer<R1, R2> {
     fn set_viewport(&mut self, viewport: Viewport) {
         self.viewport = viewport;
         self.reset_subrenderer_viewports();
@@ -154,29 +127,29 @@ impl Renderer for SplitRenderer {
 }
 
 /// Splits the viewport between a left and right renderer.
-pub struct HSplitRenderer {
-    split_renderer: SplitRenderer,
+pub struct HSplitRenderer<Left: Renderer, Right: Renderer> {
+    split_renderer: SplitRenderer<Left, Right>,
 }
 
-impl HSplitRenderer {
-    pub fn new(viewport: Viewport, split_point: SplitPoint, left: Box<dyn Renderer>, right: Box<dyn Renderer>) -> Self {
-        let split_renderer = SplitRenderer::new(viewport, true, split_point, left, right);
+impl<Left: Renderer, Right: Renderer> HSplitRenderer<Left, Right> {
+    pub fn new(split_point: SplitPoint, left: Left, right: Right) -> Self {
+        let split_renderer = SplitRenderer::new(true, split_point, left, right);
         Self { split_renderer }
     }
 
-    pub fn get_left(&self) -> &dyn Renderer {
+    pub fn get_left(&self) -> &Left {
         self.split_renderer.get_r1()
     }
 
-    pub fn get_right(&self) -> &dyn Renderer {
+    pub fn get_right(&self) -> &Right {
         self.split_renderer.get_r2()
     }
 
-    pub fn get_left_mut(&mut self) -> &mut dyn Renderer {
+    pub fn get_left_mut(&mut self) -> &mut Left {
         self.split_renderer.get_r1_mut()
     }
 
-    pub fn get_right_mut(&mut self) -> &mut dyn Renderer {
+    pub fn get_right_mut(&mut self) -> &mut Right {
         self.split_renderer.get_r2_mut()
     }
 
@@ -185,7 +158,7 @@ impl HSplitRenderer {
     }
 }
 
-impl Renderer for HSplitRenderer {
+impl<Left: Renderer, Right: Renderer> Renderer for HSplitRenderer<Left, Right> {
     fn set_viewport(&mut self, viewport: Viewport) {
         self.split_renderer.set_viewport(viewport);
     }
@@ -196,29 +169,29 @@ impl Renderer for HSplitRenderer {
 }
 
 /// Splits the viewport between a top and bottom renderer.
-pub struct VSplitRenderer {
-    split_renderer: SplitRenderer,
+pub struct VSplitRenderer<Top: Renderer, Bottom: Renderer> {
+    split_renderer: SplitRenderer<Top, Bottom>,
 }
 
-impl VSplitRenderer {
-    pub fn new(viewport: Viewport, split_point: SplitPoint, top: Box<dyn Renderer>, bottom: Box<dyn Renderer>) -> Self {
-        let split_renderer = SplitRenderer::new(viewport, false, split_point, top, bottom);
+impl<Top: Renderer, Bottom: Renderer> VSplitRenderer<Top, Bottom> {
+    pub fn new(split_point: SplitPoint, top: Top, bottom: Bottom) -> Self {
+        let split_renderer = SplitRenderer::new(false, split_point, top, bottom);
         Self { split_renderer }
     }
 
-    pub fn get_top(&self) -> &dyn Renderer {
+    pub fn get_top(&self) -> &Top {
         self.split_renderer.get_r1()
     }
 
-    pub fn get_bottom(&self) -> &dyn Renderer {
+    pub fn get_bottom(&self) -> &Bottom {
         self.split_renderer.get_r2()
     }
 
-    pub fn get_top_mut(&mut self) -> &mut dyn Renderer {
+    pub fn get_top_mut(&mut self) -> &mut Top {
         self.split_renderer.get_r1_mut()
     }
 
-    pub fn get_bottom_mut(&mut self) -> &mut dyn Renderer {
+    pub fn get_bottom_mut(&mut self) -> &mut Bottom {
         self.split_renderer.get_r2_mut()
     }
 
@@ -227,7 +200,7 @@ impl VSplitRenderer {
     }
 }
 
-impl Renderer for VSplitRenderer {
+impl<Top: Renderer, Bottom: Renderer> Renderer for VSplitRenderer<Top, Bottom> {
     fn set_viewport(&mut self, viewport: Viewport) {
         self.split_renderer.set_viewport(viewport);
     }
@@ -239,40 +212,40 @@ impl Renderer for VSplitRenderer {
 
 /// Renders one renderer inside another, with a specified inset.
 /// The inset is the distance from the edge of the viewport to the edge of the inner renderer.
-pub struct InsetRenderer {
+pub struct InsetRenderer<Outer: Renderer, Inner: Renderer> {
     viewport: Viewport,
     inset: i32,
-    outside_renderer: Box<dyn Renderer>,
-    inside_renderer: Box<dyn Renderer>,
+    outer: Outer,
+    inner: Inner,
 }
 
-impl InsetRenderer {
-    pub fn new(viewport: Viewport, inset: i32, outside_renderer: Box<dyn Renderer>, inside_renderer: Box<dyn Renderer>) -> Self {
+impl<Outer: Renderer, Inner: Renderer> InsetRenderer<Outer, Inner> {
+    pub fn new(inset: i32, outer: Outer, inner: Inner) -> Self {
         let mut self_ = Self {
-            viewport,
+            viewport: Viewport::default(),
             inset,
-            outside_renderer,
-            inside_renderer,
+            outer,
+            inner,
         };
 
         self_.reset_subrenderer_viewports();
         self_
     }
 
-    pub fn get_outside(&self) -> &dyn Renderer {
-        self.outside_renderer.as_ref()
+    pub fn get_outer(&self) -> &Outer {
+        &self.outer
     }
 
-    pub fn get_inside(&self) -> &dyn Renderer {
-        self.inside_renderer.as_ref()
+    pub fn get_inner(&self) -> &Inner {
+        &self.inner
     }
 
-    pub fn get_outside_mut(&mut self) -> &mut dyn Renderer {
-        self.outside_renderer.as_mut()
+    pub fn get_outer_mut(&mut self) -> &mut Outer {
+        &mut self.outer
     }
 
-    pub fn get_inside_mut(&mut self) -> &mut dyn Renderer {
-        self.inside_renderer.as_mut()
+    pub fn get_inner_mut(&mut self) -> &mut Inner {
+        &mut self.inner
     }
 
     pub fn set_inset(&mut self, inset: i32) {
@@ -296,40 +269,38 @@ impl InsetRenderer {
             size: isize_,
         };
 
-        self.outside_renderer.set_viewport(self.viewport);
-        self.inside_renderer.set_viewport(irect);
+        self.outer.set_viewport(self.viewport);
+        self.inner.set_viewport(irect);
     }
 }
 
-impl Renderer for InsetRenderer {
+impl<Outer: Renderer, Inner: Renderer> Renderer for InsetRenderer<Outer, Inner> {
     fn set_viewport(&mut self, viewport: Viewport) {
         self.viewport = viewport;
         self.reset_subrenderer_viewports();
     }
 
     fn render(&self) {
-        self.outside_renderer.render();
-        self.inside_renderer.render();
+        self.outer.render();
+        self.inner.render();
     }
 }
 
-pub struct FixedAspectRatioRenderer {
+pub struct FixedAspectRatioRenderer<R: Renderer> {
     viewport: Viewport,
     aspect_ratio: f32,
-    renderer: Box<dyn Renderer>,
+    renderer: R,
 }
 
-impl FixedAspectRatioRenderer {
-    pub fn new(viewport: Viewport, aspect_ratio: f32, renderer: Box<dyn Renderer>) -> Self {
-
+impl<R: Renderer> FixedAspectRatioRenderer<R> {
+    pub fn new(aspect_ratio: f32, renderer: R) -> Self {
         let mut self_ = Self {
-            viewport,
+            viewport: Viewport::default(),
             aspect_ratio,
             renderer,
         };
 
         self_.reset_subrenderer_viewports();
-
         self_
     }
 
@@ -357,12 +328,12 @@ impl FixedAspectRatioRenderer {
         self.renderer.set_viewport(new_viewport);
     }
 
-    pub fn get_subrenderer(&self) -> &dyn Renderer {
-        self.renderer.as_ref()
+    pub fn get_subrenderer(&self) -> &R {
+        &self.renderer
     }
 
-    pub fn get_subrenderer_mut(&mut self) -> &mut dyn Renderer {
-        self.renderer.as_mut()
+    pub fn get_subrenderer_mut(&mut self) -> &mut R {
+        &mut self.renderer
     }
 
     pub fn set_aspect_ratio(&mut self, aspect_ratio: f32) {
@@ -371,7 +342,7 @@ impl FixedAspectRatioRenderer {
     }
 }
 
-impl Renderer for FixedAspectRatioRenderer {
+impl<R: Renderer> Renderer for FixedAspectRatioRenderer<R> {
     fn set_viewport(&mut self, viewport: Viewport) {
         self.viewport = viewport;
         self.reset_subrenderer_viewports();

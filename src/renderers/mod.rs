@@ -1,5 +1,4 @@
 pub mod basic_renderers;
-pub mod image_renderer;
 pub mod system_text;
 pub mod texture_renderer;
 
@@ -19,8 +18,6 @@ impl Viewport {
     pub fn gl_viewport(&self) {
         unsafe {
             gl::Viewport(self.pos[0], self.pos[1], self.size[0], self.size[1]);
-            gl::Scissor(self.pos[0], self.pos[1], self.size[0], self.size[1]);
-            gl::Enable(gl::SCISSOR_TEST);
         }
     }
 }
