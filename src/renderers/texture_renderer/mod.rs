@@ -38,30 +38,32 @@ pub struct TextureRenderer {
 
 impl TextureRenderer {
     pub fn new() -> Result<Self, Error> {
-        use crate::gl_utils::{
-            shader::ShaderProgramBuilder,
-            vertex_array::create_interleaved_f32_vertex_array
-        };
+        let program = glh::ProgramBuilder::new()
+            .with_vertex_shader(VCODE)?
+            .with_fragment_shader(FCODE)?
+            .build()?;
 
-        let mut builder = ShaderProgramBuilder::new();
-        builder.add_vertex_shader(VCODE)?;
-        builder.add_fragment_shader(FCODE)?;
-        let program = builder.build()?;
-
+        #[rustfmt::skip]
         let vertices: &[f32] = &[
-            // pos, texCoord
-            -1.0, 1.0, 0.0, 0.0,
-            1.0, 1.0, 1.0, 0.0,
-            1.0, -1.0, 1.0, 1.0,
-            -1.0, -1.0, 0.0, 1.0,
+            // pos,        texCoord
+            -1.0,  1.0,    0.0, 0.0,
+             1.0,  1.0,    1.0, 0.0,
+             1.0, -1.0,    1.0, 1.0,
+            -1.0, -1.0,    0.0, 1.0,
         ];
 
         let component_counts = &[2, 2];
 
-        let v = create_interleaved_f32_vertex_array(
-            vertices,
+        let buffer = glh::create_buffer(vertices, gl::STATIC_DRAW)?;
+        let mut vao = 0;
+        unsafe { gl::GenVertexArrays(1, &mut vao); }
+        glh::enable_interleaved_vertex_array_attributes(
+            vao,
+            buffer,
+            gl::FLOAT,
+            false,
+            0,
             component_counts,
-            gl::STATIC_DRAW,
         )?;
 
         unsafe {
@@ -73,8 +75,8 @@ impl TextureRenderer {
         Ok(Self {
             viewport: Viewport::default(),
             program,
-            vao: v.vao,
-            vbo: v.buffers[0],
+            vao,
+            vbo: buffer,
             texture: None,
         })
     }
@@ -82,7 +84,7 @@ impl TextureRenderer {
     /// Sets the texture to be used for rendering.
     /// Ownership of the texture is **not** transferred. This essentially acts like a raw pointer.
     /// The texture will not be deleted when this struct is dropped.
-    pub unsafe fn set_texture(&mut self, texture: Option<u32>) {
+    pub fn set_texture(&mut self, texture: Option<u32>) {
         self.texture = texture;
     }
 }
@@ -98,6 +100,7 @@ impl Renderer for TextureRenderer {
             unsafe {
                 gl::UseProgram(self.program);
                 gl::BindVertexArray(self.vao);
+                gl::ActiveTexture(gl::TEXTURE0);
                 gl::BindTexture(gl::TEXTURE_2D, tex);
                 gl::DrawArrays(gl::TRIANGLE_FAN, 0, 4);
             }

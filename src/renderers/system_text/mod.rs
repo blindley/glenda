@@ -213,16 +213,13 @@ fn create_vertex_array() -> Result<(u32, u32), Error> {
 }
 
 fn create_program() -> Result<u32, Error> {
-    use crate::gl_utils::shader::ShaderProgramBuilder;
+    let vcode = include_str!("shaders/vshader.glsl");
+    let fcode = include_str!("shaders/fshader.glsl");
 
-    let vshader_code = include_str!("shaders/vshader.glsl");
-    let fshader_code = include_str!("shaders/fshader.glsl");
-
-    let mut builder = ShaderProgramBuilder::new();
-    builder.add_vertex_shader(vshader_code)?;
-    builder.add_fragment_shader(fshader_code)?;
-
-    let program = builder.build()?;
+    let program = glh::ProgramBuilder::new()
+        .with_vertex_shader(vcode)?
+        .with_fragment_shader(fcode)?
+        .build()?;
 
     Ok(program)
 }

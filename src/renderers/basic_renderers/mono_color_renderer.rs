@@ -32,12 +32,10 @@ pub struct MonoColorRenderer {
 
 impl MonoColorRenderer {
     pub fn new(color: [f32; 4]) -> Result<Self, Error> {
-        use crate::gl_utils::shader::ShaderProgramBuilder;
-
-        let mut builder = ShaderProgramBuilder::new();
-        builder.add_vertex_shader(VCODE)?;
-        builder.add_fragment_shader(FCODE)?;
-        let program = builder.build()?;
+        let program = glh::ProgramBuilder::new()
+            .with_vertex_shader(VCODE)?
+            .with_fragment_shader(FCODE)?
+            .build()?;
 
         let mut _self = Self {
             viewport: Viewport::default(),
