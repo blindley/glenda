@@ -1,6 +1,6 @@
 [package]
 name = "glenda"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 keywords = ["opengl", "graphics", "gamedev"]
@@ -11,7 +11,11 @@ readme = "README.md"
 [dependencies]
 gl = "0.14"
 glh = "0.1.3"
+nalgebra = "0.33.2"
 
 [build-dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0"
+
+[dev-dependencies]
+glume = "0.7.2"

@@ -1,8 +1,13 @@
 pub mod basic_renderers;
 pub mod system_text;
 pub mod texture_renderer;
+pub mod tilemap_renderer;
 
 use crate::gl;
+
+use nalgebra::Matrix4;
+pub type Mat4 = Matrix4<f32>;
+
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Viewport {
@@ -61,4 +66,13 @@ impl From<(i32, i32)> for Viewport {
 pub trait Renderer {
     fn set_viewport(&mut self, viewport: Viewport);
     fn render(&self);
+}
+
+pub trait Transformable {
+    fn set_transform(&mut self, transform: Mat4);
+
+    /// Sets the transform to the identity matrix.
+    fn clear_transform(&mut self) {
+        self.set_transform(Mat4::identity());
+    }
 }
